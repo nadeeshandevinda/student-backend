@@ -1,93 +1,150 @@
-import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text, View, TextInput, Button, FlatList, Alert, TouchableOpacity } from 'react-native';
-import axios from 'axios';
+import React, { useEffect, useState } from 'react';
+import { View, Text, FlatList, ActivityIndicator, StyleSheet, Alert, TextInput, TouchableOpacity } from 'react-native';
+
+// 🔥 ඔයාගේ Live Render Link එක
+const API_URL = "https://student-backend-jzaa.onrender.com/students";
 
 export default function App() {
-  // --- මෙතනට ඔයාගේ මැෂින් එකේ IP එක දාන්න ---
-  const API_URL = "http://192.168.1.173:3000"; 
-
   const [students, setStudents] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Form Inputs
   const [name, setName] = useState("");
   const [age, setAge] = useState("");
   const [city, setCity] = useState("");
 
-  // 1. Data Load කිරීම
   useEffect(() => {
-    loadStudents();
+    loadData();
   }, []);
 
-  const loadStudents = () => {
-    axios.get(`${API_URL}/students`)
-      .then(res => setStudents(res.data))
-      .catch(err => console.log("Error loading data:", err));
+  // 1. READ: Data ගන්න
+  const loadData = async () => {
+    try {
+      const response = await fetch(API_URL);
+      const json = await response.json();
+      setStudents(json);
+      setLoading(false);
+    } catch (error) {
+      Alert.alert("Error", error.message);
+      setLoading(false);
+    }
   };
 
-  // 2. Data ඇතුලත් කිරීම
-  const addStudent = () => {
-    if (!name || !age || !city) {
-      Alert.alert("Error", "Please fill all fields");
+  // 2. CREATE: Data ඇතුලත් කරන (Age එක Number එකක් කරා)
+  const addStudent = async () => {
+    if (name === "" || age === "" || city === "") {
+      Alert.alert("Error", "Please fill all fields!");
       return;
     }
 
-    axios.post(`${API_URL}/add-student`, { name, age, city })
-      .then(() => {
-        Alert.alert("Success", "Student Added!");
-        setName(""); setAge(""); setCity("");
-        loadStudents();
-      })
-      .catch(err => {
-        console.log(err);
-        Alert.alert("Error", "Could not connect to server");
+    try {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // 👇 Age එක Number එකක් බවට හරවලා යවනවා (parseInt)
+        body: JSON.stringify({ name, age: parseInt(age), city })
       });
+
+      if (response.ok) {
+        Alert.alert("Success", "Student Added Successfully!");
+        setName(""); setAge(""); setCity(""); 
+        loadData(); 
+      } else {
+        // Error එක මොකක්ද කියලා හරියටම බලාගන්න
+        const errorText = await response.text();
+        Alert.alert("Error", "Server Error: " + errorText);
+      }
+
+    } catch (error) {
+      Alert.alert("Error", error.message);
+    }
   };
 
-  // 3. Data මැකීම
-  const deleteStudent = (id) => {
-    axios.delete(`${API_URL}/delete-student/${id}`)
-      .then(() => {
-        Alert.alert("Deleted", "Student removed");
-        loadStudents();
-      })
-      .catch(err => console.log(err));
+  // 3. DELETE: Data මකන කොටස
+  const deleteStudent = async (id) => {
+    Alert.alert(
+      "Confirm Delete",
+      "Are you sure you want to delete this student?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Delete", 
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const response = await fetch(`${API_URL}/${id}`, {
+                method: 'DELETE',
+              });
+
+              if (response.ok) {
+                Alert.alert("Deleted", "Student removed!");
+                loadData(); // ලිස්ට් එක අලුත් කරමු
+              } else {
+                Alert.alert("Error", "Failed to delete");
+              }
+            } catch (error) {
+              Alert.alert("Error", error.message);
+            }
+          }
+        }
+      ]
+    );
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>🎓 Mobile Student App</Text>
+      <Text style={styles.title}>Student Manager (CRUD) 🚀</Text>
 
-      {/* --- FORM --- */}
-      <TextInput placeholder="Name" value={name} onChangeText={setName} style={styles.input} />
-      <TextInput placeholder="Age" value={age} onChangeText={setAge} keyboardType="numeric" style={styles.input} />
-      <TextInput placeholder="City" value={city} onChangeText={setCity} style={styles.input} />
-      
-      <Button title="Add Student" onPress={addStudent} />
+      {/* Form Section */}
+      <View style={styles.form}>
+        <TextInput style={styles.input} placeholder="Name" value={name} onChangeText={setName} />
+        <TextInput style={styles.input} placeholder="Age" keyboardType="numeric" value={age} onChangeText={setAge} />
+        <TextInput style={styles.input} placeholder="City" value={city} onChangeText={setCity} />
+        
+        <TouchableOpacity style={styles.addButton} onPress={addStudent}>
+          <Text style={styles.buttonText}>Add Student</Text>
+        </TouchableOpacity>
+      </View>
 
-      {/* --- LIST --- */}
-      <FlatList
-        data={students}
-        keyExtractor={(item) => item._id}
-        style={{ marginTop: 20, width: '100%' }}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View>
-              <Text style={styles.name}>{item.name}</Text>
-              <Text>{item.age} years - {item.city}</Text>
+      {/* List Section */}
+      {loading ? (
+        <ActivityIndicator size="large" color="blue" />
+      ) : (
+        <FlatList
+          data={students}
+          keyExtractor={(item) => item._id}
+          renderItem={({ item }) => (
+            <View style={styles.card}>
+              <View style={styles.info}>
+                <Text style={styles.name}>{item.name}</Text>
+                <Text style={styles.details}>Age: {item.age} | City: {item.city}</Text>
+              </View>
+              {/* 👇 Delete Button එක */}
+              <TouchableOpacity style={styles.deleteButton} onPress={() => deleteStudent(item._id)}>
+                <Text style={styles.deleteText}>Delete</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={() => deleteStudent(item._id)} style={styles.deleteBtn}>
-              <Text style={{color: 'white'}}>Delete</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      />
+          )}
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#fff', alignItems: 'center', paddingTop: 50, paddingHorizontal: 20 },
-  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20 },
-  input: { width: '100%', borderWidth: 1, borderColor: '#ccc', padding: 10, marginBottom: 10, borderRadius: 5 },
-  card: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 15, borderBottomWidth: 1, borderBottomColor: '#eee', width: '100%' },
+  container: { flex: 1, padding: 20, paddingTop: 50, backgroundColor: '#f0f2f5' },
+  title: { fontSize: 24, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
+  
+  form: { backgroundColor: 'white', padding: 15, borderRadius: 10, marginBottom: 20, elevation: 3 },
+  input: { borderBottomWidth: 1, borderColor: '#ccc', padding: 8, marginBottom: 10, fontSize: 16 },
+  addButton: { backgroundColor: '#28a745', padding: 12, borderRadius: 8, alignItems: 'center' },
+  buttonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
+
+  card: { backgroundColor: 'white', padding: 15, marginBottom: 10, borderRadius: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', elevation: 2 },
+  info: { flex: 1 },
   name: { fontSize: 18, fontWeight: 'bold' },
-  deleteBtn: { backgroundColor: 'red', padding: 8, borderRadius: 5 }
+  details: { color: '#555' },
+  
+  deleteButton: { backgroundColor: '#dc3545', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 6 },
+  deleteText: { color: 'white', fontWeight: 'bold' }
 });

@@ -1,71 +1,58 @@
 ﻿const express = require('express');
 const mongoose = require('mongoose');
-const cors = require('cors'); // අලුතෙන් දාපු කෑල්ල
+const cors = require('cors');
 const app = express();
-const port = process.env.PORT || 3000;
 
-app.use(express.json());
-app.use(cors()); // React එකට අවසර දීම
+// Middleware
+app.use(cors());
+app.use(express.json()); // Data කියවන්න මේක ඕනමයි
 
-// --- Database Connection ---
-const mongoURI = "mongodb+srv://devinda:devinda123@cluster0.bppuh4q.mongodb.net/?appName=Cluster0"; 
+// Database Connection
+mongoose.connect('mongodb+srv://nadeeshan:nadeeshan123@cluster0.mongodb.net/studentdb?retryWrites=true&w=majority&appName=Cluster0')
+  .then(() => console.log("DB Connected!"))
+  .catch(err => console.error(err));
 
-mongoose.connect(mongoURI)
-  .then(() => console.log("✅ MongoDB Connected!"))
-  .catch((err) => console.log("❌ Connection Error:", err));
-
-// --- Schema & Model ---
+// Create Schema
 const studentSchema = new mongoose.Schema({
-    name: String,
-    age: Number,
-    city: String
+  name: String,
+  age: Number,
+  city: String
 });
+
 const Student = mongoose.model('Student', studentSchema);
 
-// --- Routes (API Endpoints) ---
-
-// 1. Create (දත්ත ඇතුලත් කිරීම)
-app.post('/add-student', async (req, res) => {
-    try {
-        const newStudent = new Student(req.body);
-        await newStudent.save();
-        res.send("Student Saved!");
-    } catch (err) {
-        res.status(400).send("Error: " + err);
-    }
-});
-
-// 2. Read (දත්ත බැලීම)
+// 1. Routes - READ (Data ගන්න)
 app.get('/students', async (req, res) => {
-    try {
-        const students = await Student.find();
-        res.json(students);
-    } catch (err) {
-        res.status(500).send("Error: " + err);
-    }
+  try {
+    const students = await Student.find();
+    res.json(students);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// 3. Update (දත්ත වෙනස් කිරීම)
-app.put('/update-student/:id', async (req, res) => {
-    try {
-        // ID එකෙන් හොයලා ඩේටා වෙනස් කරනවා
-        await Student.findByIdAndUpdate(req.params.id, req.body);
-        res.send("Student Updated!");
-    } catch (err) {
-        res.status(400).send("Error: " + err);
-    }
+// 2. Routes - CREATE (Data දාන්න) - මේක තමයි ඔයාට නැත්තේ
+app.post('/students', async (req, res) => {
+  try {
+    const newStudent = new Student(req.body);
+    await newStudent.save();
+    res.json(newStudent);
+    console.log("Student Added!");
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// 4. Delete (දත්ත මැකීම)
-app.delete('/delete-student/:id', async (req, res) => {
-    try {
-        await Student.findByIdAndDelete(req.params.id);
-        res.send("Student Deleted!");
-    } catch (err) {
-        res.status(400).send("Error: " + err);
-    }
+// 3. Routes - DELETE (Data මකන්න)
+app.delete('/students/:id', async (req, res) => {
+  try {
+    await Student.findByIdAndDelete(req.params.id);
+    res.json({ message: "Deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
-app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
+app.listen(3000, () => {
+  console.log('Server running on port 3000');
 });
